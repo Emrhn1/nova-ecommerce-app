@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import AppThemeProvider from "@/theme/ThemeProvider";
+import StoreProvider from "@/lib/redux/StoreProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -20,16 +22,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="tr"
-      className={`${inter.variable} ${inter.className} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">
-        <AppThemeProvider>
-          {children}
-        </AppThemeProvider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html
+        lang="tr"
+        className={`${inter.variable} ${inter.className} h-full antialiased`}
+      >
+        <body className="min-h-full flex flex-col">
+          <StoreProvider>
+            <AppThemeProvider>
+              {children}
+            </AppThemeProvider>
+          </StoreProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
-
