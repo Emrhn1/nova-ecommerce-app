@@ -19,6 +19,7 @@ import { useUser, UserButton } from '@clerk/nextjs';
 import { useAppDispatch, useAppSelector } from '@/lib/redux/hooks';
 import { selectCartTotalQuantity, toggleCartDrawer } from '@/lib/redux/cartSlice';
 import CartDrawer from '@/components/cart/CartDrawer';
+import SearchModal from './SearchModal';
 
 const NAV_LINKS = [
   { label: 'New', href: '/products?filter=new' },
@@ -28,6 +29,7 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const dispatch = useAppDispatch();
   const cartItemCount = useAppSelector(selectCartTotalQuantity);
   const { isSignedIn, isLoaded } = useUser();
@@ -91,7 +93,11 @@ export default function Navbar() {
 
           {/* Sağ: İkonlar & Clerk Auth */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, sm: 1 } }}>
-            <IconButton color="inherit" aria-label="Search">
+            <IconButton
+              color="inherit"
+              aria-label="Search products"
+              onClick={() => setSearchOpen(true)}
+            >
               <Search size={20} />
             </IconButton>
 
@@ -197,6 +203,9 @@ export default function Navbar() {
 
       {/* Mini Cart Drawer Component */}
       <CartDrawer />
+
+      {/* Search Modal Component */}
+      <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
 }

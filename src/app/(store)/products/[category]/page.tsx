@@ -56,6 +56,7 @@ export default async function CategoryProductsPage({ params, searchParams }: Cat
 
   const sortOption = resolvedSearchParams.sort || 'newest';
   const saleOnly = resolvedSearchParams.sale === 'true';
+  const searchQuery = resolvedSearchParams.search?.trim();
 
   // 2. Veri Filtreleme Mantığı (Server-Side)
   let filteredProducts: Product[] = MOCK_PRODUCTS.filter((prod) => {
@@ -64,6 +65,12 @@ export default async function CategoryProductsPage({ params, searchParams }: Cat
     }
     if (saleOnly && prod.badge !== 'Sale') {
       return false;
+    }
+    if (searchQuery) {
+      const term = searchQuery.toLowerCase();
+      if (!prod.title.toLowerCase().includes(term)) {
+        return false;
+      }
     }
     return true;
   });

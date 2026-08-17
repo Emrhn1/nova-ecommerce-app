@@ -5,13 +5,14 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import Link from 'next/link';
 import ProductCard from '@/components/store/ProductCard';
 import ProductSort from '@/components/product/ProductSort';
 import ProductFilters from '@/components/product/ProductFilters';
 import { MOCK_PRODUCTS } from '@/lib/mockData';
 import { Product } from '@/types/product';
-import { ChevronRight, PackageSearch } from 'lucide-react';
+import { ChevronRight, PackageSearch, X } from 'lucide-react';
 
 interface ProductsPageProps {
   searchParams: Promise<{
@@ -27,6 +28,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const categoryFilter = resolvedParams.category?.toLowerCase();
   const sortOption = resolvedParams.sort || 'newest';
   const saleOnly = resolvedParams.sale === 'true';
+  const searchQuery = resolvedParams.search?.trim();
 
   // 1. Veri Filtreleme Mantığı (Server-Side)
   let filteredProducts: Product[] = MOCK_PRODUCTS.filter((prod) => {
@@ -35,6 +37,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     }
     if (saleOnly && prod.badge !== 'Sale') {
       return false;
+    }
+    if (searchQuery) {
+      const term = searchQuery.toLowerCase();
+      const matchesTitle = prod.title.toLowerCase().includes(term);
+      const matchesCategory = prod.category.toLowerCase().includes(term);
+      if (!matchesTitle && !matchesCategory) {
+        return false;
+      }
     }
     return true;
   });
@@ -47,7 +57,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     return 0; // newest / default
   });
 
-  const categoryTitle = categoryFilter
+  const pageTitle = searchQuery
+    ? `Search Results for "${searchQuery}"`
+    : categoryFilter
     ? categoryFilter.charAt(0).toUpperCase() + categoryFilter.slice(1)
     : 'All Products';
 
@@ -62,9 +74,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
           Home
         </Link>
-        <Typography color="text.primary" sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
+        <Link href="/products" style={{ textDecoration: 'none', color: 'inherit' }}>
           Products
-        </Typography>
+        </Link>
+        {searchQuery && (
+          <Typography color="text.primary" sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
+            Search: {searchQuery}
+          </Typography>
+        )}
       </Breadcrumbs>
 
       {/* Üst Header Bar (Başlık, Ürün Sayısı & Sıralama) */}
@@ -79,9 +96,26 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
         }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
-            {categoryTitle}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+            <Typography variant="h4" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
+              {pageTitle}
+            </Typography>
+            {searchQuery && (
+              <Link href="/products" style={{ textDecoration: 'none' }}>
+                <Chip
+                  label={`Clear search: "${searchQuery}" ✕`}
+                  size="small"
+                  variant="outlined"
+                  sx={{
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    bgcolor: 'action.hover',
+                    '&:hover': { bgcolor: 'action.selected' },
+                  }}
+                />
+              </Link>
+            )}
+          </Box>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             Showing {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'}
           </Typography>
@@ -128,7 +162,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
                 No products found
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 360, mb: 3 }}>
-                We couldn't find any products matching your current filters. Try resetting your filters to see more results.
+                We couldn&apos;t find any products matching your search &ldquo;{searchQuery || 'current filters'}&rdquo;. Try resetting your filters to see more results.
               </Typography>
               <Link href="/products" style={{ textDecoration: 'none' }}>
                 <Button variant="contained" color="primary">
