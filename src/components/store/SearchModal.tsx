@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Dialog from '@mui/material/Dialog';
@@ -13,29 +13,43 @@ import Divider from '@mui/material/Divider';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import { Search, X, ArrowRight, TrendingUp } from 'lucide-react';
-import { MOCK_PRODUCTS } from '@/lib/mockData';
 import { Product } from '@/types/product';
+import { searchProductsAction } from '@/app/actions/search';
 
 interface SearchModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-const POPULAR_SEARCHES = ['Audio', 'Headphones', 'Accessories', 'Watch', 'Wireless'];
+const POPULAR_SEARCHES = ['Audio', 'Headphones', 'Workspace', 'Carry', 'Wearables'];
 
 export default function SearchModal({ open, onClose }: SearchModalProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
+  const [liveResults, setLiveResults] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Live filter mock products based on search term
-  const liveResults: Product[] = useMemo(() => {
-    const trimmed = query.trim().toLowerCase();
-    if (!trimmed) return [];
-    return MOCK_PRODUCTS.filter(
-      (prod) =>
-        prod.title.toLowerCase().includes(trimmed) ||
-        prod.category.toLowerCase().includes(trimmed)
-    ).slice(0, 5);
+  useEffect(() => {
+    const term = query.trim();
+    if (!term) {
+      setLiveResults([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchProductsAction(term);
+        setLiveResults(results.slice(0, 5));
+      } catch (err) {
+        console.error('Search action failed:', err);
+      } finally {
+        setLoading(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
   }, [query]);
 
   const handleSearchSubmit = (searchQuery: string) => {
@@ -191,7 +205,9 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
         {query.trim() && (
           <Box>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, mb: 1.5, display: 'block' }}>
-              {liveResults.length > 0
+              {loading
+                ? `Searching for "${query}"...`
+                : liveResults.length > 0
                 ? `Results for "${query}"`
                 : `No products found for "${query}"`}
             </Typography>
@@ -254,9 +270,11 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
                 ))}
               </Stack>
             ) : (
-              <Typography variant="body2" sx={{ color: 'text.secondary', py: 2, textAlign: 'center' }}>
-                Try searching for audio, watch, accessories, or other keywords.
-              </Typography>
+              !loading && (
+                <Typography variant="body2" sx={{ color: 'text.secondary', py: 2, textAlign: 'center' }}>
+                  Try searching for audio, workspace, carry, wearables, or other keywords.
+                </Typography>
+              )
             )}
           </Box>
         )}
