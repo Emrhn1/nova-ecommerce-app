@@ -3,16 +3,45 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import { Product } from '@/types/product';
+import { prisma } from '@/lib/prisma';
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface LiveStockAndPriceProps {
-  product: Product;
+  productId?: string;
+  product?: Product;
 }
 
-export default async function LiveStockAndPrice({ product }: LiveStockAndPriceProps) {
-  // Simüle edilmiş sunucu taraflı anlık stok & fiyat doğrulaması
-  const discountPercent = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+export default async function LiveStockAndPrice({ productId, product }: LiveStockAndPriceProps) {
+  let targetProduct = product;
+
+  if (productId && !targetProduct) {
+    try {
+      const dbProd = await prisma.product.findUnique({
+        where: { id: productId },
+      });
+      if (dbProd) {
+        targetProduct = {
+          id: dbProd.id,
+          title: dbProd.title,
+          slug: dbProd.slug,
+          category: '',
+          price: dbProd.price,
+          originalPrice: dbProd.originalPrice || undefined,
+          rating: dbProd.rating,
+          reviewCount: dbProd.reviewCount,
+          imageUrl: dbProd.imageUrl,
+          inStock: dbProd.inStock,
+        };
+      }
+    } catch (e) {
+      console.error('Error fetching live stock and price:', e);
+    }
+  }
+
+  if (!targetProduct) return null;
+
+  const discountPercent = targetProduct.originalPrice
+    ? Math.round(((targetProduct.originalPrice - targetProduct.price) / targetProduct.originalPrice) * 100)
     : 0;
 
   return (
@@ -20,12 +49,12 @@ export default async function LiveStockAndPrice({ product }: LiveStockAndPricePr
       {/* Fiyat Alanı */}
       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 1 }}>
         <Typography variant="h3" sx={{ fontWeight: 800 }}>
-          ${product.price}
+          ${targetProduct.price}
         </Typography>
 
-        {product.originalPrice && (
+        {targetProduct.originalPrice && (
           <Typography variant="h6" color="text.secondary" sx={{ textDecoration: 'line-through', fontWeight: 500 }}>
-            ${product.originalPrice}
+            ${targetProduct.originalPrice}
           </Typography>
         )}
 
@@ -40,7 +69,7 @@ export default async function LiveStockAndPrice({ product }: LiveStockAndPricePr
 
       {/* Stok Durumu Rozeti */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        {product.inStock ? (
+        {targetProduct.inStock ? (
           <>
             <CheckCircle2 size={18} color="#22c55e" />
             <Typography variant="body2" sx={{ color: '#16a34a', fontWeight: 600 }}>

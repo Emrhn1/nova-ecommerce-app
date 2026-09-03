@@ -13,7 +13,7 @@ import Link from 'next/link';
 import ProductGallery from '@/components/product/ProductGallery';
 import LiveStockAndPrice from '@/components/product/LiveStockAndPrice';
 import ProductQuantitySelector from '@/components/product/ProductQuantitySelector';
-import { MOCK_PRODUCTS } from '@/lib/mockData';
+import { getProductBySlug } from '@/lib/db/products';
 import { ChevronRight, Star, ShieldCheck, Truck, RotateCcw } from 'lucide-react';
 
 // ISR (Incremental Static Regeneration): 1 Saat revalidation
@@ -29,7 +29,7 @@ interface ProductDetailPageProps {
 // 1. Dinamik SEO Metadata Üretimi
 export async function generateMetadata({ params }: ProductDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const product = MOCK_PRODUCTS.find((p) => p.slug === slug);
+  const product = await getProductBySlug(slug);
 
   if (!product) {
     return {
@@ -39,10 +39,10 @@ export async function generateMetadata({ params }: ProductDetailPageProps): Prom
 
   return {
     title: `${product.title} | NOVA Commerce`,
-    description: `Buy ${product.title} in ${product.category} at NOVA Commerce. Premium quality with fast shipping.`,
+    description: `Buy ${product.title} in ${product.categoryName} at NOVA Commerce. Premium quality with fast shipping.`,
     openGraph: {
       title: product.title,
-      description: `Premium ${product.category} product - $${product.price}`,
+      description: `Premium ${product.categoryName} product - $${product.price}`,
       images: [{ url: product.imageUrl }],
     },
   };
@@ -60,19 +60,19 @@ function PriceStockSkeleton() {
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { category, slug } = await params;
-  const product = MOCK_PRODUCTS.find((p) => p.slug === slug);
+  const product = await getProductBySlug(slug);
 
   if (!product) {
     notFound();
   }
 
-  // Google Rich Snippets için Schema.org JSON-LD Yapısı
+  // Schema.org Structured Data (JSON-LD)
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: product.title,
-    image: product.imageUrl,
-    description: `Premium ${product.category} item`,
+    image: [product.imageUrl],
+    description: product.description,
     offers: {
       '@type': 'Offer',
       price: product.price,
@@ -86,117 +86,151 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     },
   };
 
+  const formattedProduct = {
+    id: product.id,
+    title: product.title,
+    slug: product.slug,
+    category: product.categoryName,
+    price: product.price,
+    originalPrice: product.originalPrice || undefined,
+    rating: product.rating,
+    reviewCount: product.reviewCount,
+    imageUrl: product.imageUrl,
+    badge: (product.badge as any) || undefined,
+    inStock: product.inStock,
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ py: 4, mb: 10 }}>
-      {/* Schema.org JSON-LD Gömmesi */}
+    <>
+      {/* Schema.org Structured Data Injection */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Breadcrumb Navigasyon */}
-      <Breadcrumbs
-        separator={<ChevronRight size={14} />}
-        aria-label="breadcrumb"
-        sx={{ mb: 4, fontSize: '0.85rem' }}
-      >
-        <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-          Home
-        </Link>
-        <Link href="/products" style={{ textDecoration: 'none', color: 'inherit' }}>
-          Products
-        </Link>
-        <Link
-          href={`/products/${product.category.toLowerCase()}`}
-          style={{ textDecoration: 'none', color: 'inherit', textTransform: 'capitalize' }}
+      <Container maxWidth="lg" sx={{ py: 4, mb: 8 }}>
+        {/* Breadcrumb Navigasyon */}
+        <Breadcrumbs
+          separator={<ChevronRight size={14} />}
+          aria-label="breadcrumb"
+          sx={{ mb: 3, fontSize: '0.85rem' }}
         >
-          {product.category}
-        </Link>
-        <Typography color="text.primary" sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
-          {product.title}
-        </Typography>
-      </Breadcrumbs>
-
-      {/* Ana Ürün Detay Düzeni (Sol: Galeri, Sağ: Bilgiler & Aksiyon) */}
-      <Grid container spacing={6}>
-        {/* Sol Sütun: Görsel Galerisi (ISR Statik Kabuk) */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <ProductGallery mainImageUrl={product.imageUrl} title={product.title} />
-        </Grid>
-
-        {/* Sağ Sütun: Ürün Bilgileri & Canlı Stok / Fiyat */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-            <Chip
-              label={product.category}
-              size="small"
-              sx={{ bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', fontWeight: 600 }}
-            />
-            {product.badge && (
-              <Chip
-                label={product.badge}
-                size="small"
-                sx={{ bgcolor: '#0a0a0a', color: '#ffffff', fontWeight: 700 }}
-              />
-            )}
-          </Box>
-
-          <Typography variant="h3" sx={{ fontWeight: 800, mb: 1.5, lineHeight: 1.1 }}>
+          <Link href="/" style={{ textDecoration: 'none', color: 'inherit' }}>
+            Home
+          </Link>
+          <Link href="/products" style={{ textDecoration: 'none', color: 'inherit' }}>
+            Products
+          </Link>
+          <Link href={`/products/${product.categorySlug}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            {product.categoryName}
+          </Link>
+          <Typography color="text.primary" sx={{ fontSize: '0.85rem', fontWeight: 600 }}>
             {product.title}
           </Typography>
+        </Breadcrumbs>
 
-          {/* Yıldız & Değerlendirme Sayısı */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              <Star size={18} fill="#f59e0b" color="#f59e0b" />
-              <Typography variant="body1" sx={{ fontWeight: 700 }}>
-                {product.rating}
+        <Grid container spacing={{ xs: 3, md: 6 }}>
+          {/* Sol Kolon: Ürün Görsel Galerisi */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <ProductGallery
+              mainImageUrl={product.imageUrl}
+              title={product.title}
+            />
+          </Grid>
+
+          {/* Sağ Kolon: Detaylar & Aksiyonlar */}
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Box>
+              {/* Kategori Etiketi */}
+              <Chip
+                label={product.categoryName}
+                size="small"
+                variant="outlined"
+                sx={{ mb: 1.5, fontWeight: 600, fontSize: '0.75rem' }}
+              />
+
+              {/* Ürün Başlığı */}
+              <Typography variant="h3" component="h1" sx={{ fontWeight: 800, mb: 1.5, lineHeight: 1.2 }}>
+                {product.title}
               </Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary">
-              ({product.reviewCount} customer reviews)
-            </Typography>
-          </Box>
 
-          <Divider />
+              {/* Değerlendirme & Yorumlar */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Box sx={{ display: 'flex', color: 'warning.main' }}>
+                  <Star size={18} fill="currentColor" />
+                </Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  {product.rating}
+                </Typography>
 
-          {/* DİNAMİK ALAN (Suspense Streaming): Canlı Stok & Fiyat */}
-          <Suspense fallback={<PriceStockSkeleton />}>
-            <LiveStockAndPrice product={product} />
-          </Suspense>
+                <Typography variant="body2" color="text.secondary">
+                  ({product.reviewCount} customer reviews)
+                </Typography>
+              </Box>
 
-          <Typography variant="body1" color="text.secondary" sx={{ mb: 3, lineHeight: 1.6 }}>
-            Designed for uncompromising everyday performance. Crafted with high-grade durable materials, ultra-clear acoustic drivers, and ergonomically balanced weight for all-day comfort.
-          </Typography>
+              {/* Streaming Canlı Fiyat & Stok Bileşeni */}
+              <Suspense fallback={<PriceStockSkeleton />}>
+                <LiveStockAndPrice productId={product.id} />
+              </Suspense>
 
-          {/* Miktar Seçici & Sepete Ekle Butonu */}
-          <ProductQuantitySelector product={product} />
-
-          <Divider sx={{ my: 3 }} />
-
-          {/* Güvence Rozetleri (Teslimat, İade, Garanti) */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Truck size={20} color="#6366f1" />
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                Free Express Shipping on orders over $100
+              {/* Ürün Açıklaması */}
+              <Typography variant="body1" color="text.secondary" sx={{ mb: 3, lineHeight: 1.7 }}>
+                {product.description}
               </Typography>
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Adet Seçici & Sepete Ekle Butonu */}
+              <ProductQuantitySelector product={formattedProduct} />
+
+              <Divider sx={{ my: 3 }} />
+
+              {/* Güven ve Teslimat Rozetleri */}
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <ShieldCheck size={20} color="var(--mui-palette-primary-main)" />
+                    <Box>
+                      <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
+                        2-Year Warranty
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Full coverage
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Truck size={20} color="var(--mui-palette-primary-main)" />
+                    <Box>
+                      <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
+                        Free Express
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Orders over $150
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <RotateCcw size={20} color="var(--mui-palette-primary-main)" />
+                    <Box>
+                      <Typography variant="caption" sx={{ fontWeight: 700, display: 'block' }}>
+                        30-Day Returns
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Hassle-free
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Grid>
+              </Grid>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <RotateCcw size={20} color="#6366f1" />
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                30-day hassle-free return policy
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <ShieldCheck size={20} color="#6366f1" />
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                2-year official NOVA warranty included
-              </Typography>
-            </Box>
-          </Box>
+          </Grid>
         </Grid>
-      </Grid>
-    </Container>
+      </Container>
+    </>
   );
 }
