@@ -10,9 +10,8 @@ import Link from 'next/link';
 import ProductCard from '@/components/store/ProductCard';
 import ProductSort from '@/components/product/ProductSort';
 import ProductFilters from '@/components/product/ProductFilters';
-import { MOCK_PRODUCTS } from '@/lib/mockData';
-import { Product } from '@/types/product';
-import { ChevronRight, PackageSearch, X } from 'lucide-react';
+import { getProducts } from '@/lib/db/products';
+import { ChevronRight, PackageSearch } from 'lucide-react';
 
 interface ProductsPageProps {
   searchParams: Promise<{
@@ -30,31 +29,12 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const saleOnly = resolvedParams.sale === 'true';
   const searchQuery = resolvedParams.search?.trim();
 
-  // 1. Veri Filtreleme Mantığı (Server-Side)
-  let filteredProducts: Product[] = MOCK_PRODUCTS.filter((prod) => {
-    if (categoryFilter && prod.category.toLowerCase() !== categoryFilter) {
-      return false;
-    }
-    if (saleOnly && prod.badge !== 'Sale') {
-      return false;
-    }
-    if (searchQuery) {
-      const term = searchQuery.toLowerCase();
-      const matchesTitle = prod.title.toLowerCase().includes(term);
-      const matchesCategory = prod.category.toLowerCase().includes(term);
-      if (!matchesTitle && !matchesCategory) {
-        return false;
-      }
-    }
-    return true;
-  });
-
-  // 2. Sıralama Mantığı (Server-Side)
-  filteredProducts = [...filteredProducts].sort((a, b) => {
-    if (sortOption === 'price-asc') return a.price - b.price;
-    if (sortOption === 'price-desc') return b.price - a.price;
-    if (sortOption === 'rating') return b.rating - a.rating;
-    return 0; // newest / default
+  // 1. Database Query via Prisma Data Layer (Server Component)
+  const filteredProducts = await getProducts({
+    category: categoryFilter,
+    sort: sortOption,
+    sale: saleOnly,
+    search: searchQuery,
   });
 
   const pageTitle = searchQuery

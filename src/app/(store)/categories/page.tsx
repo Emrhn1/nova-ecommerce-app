@@ -9,7 +9,7 @@ import CardContent from '@mui/material/CardContent';
 import CardMedia from '@mui/material/CardMedia';
 import Breadcrumbs from '@mui/material/Breadcrumbs';
 import Link from 'next/link';
-import { MOCK_CATEGORIES } from '@/lib/mockData';
+import { getCategories } from '@/lib/db/categories';
 import { ChevronRight, ArrowRight } from 'lucide-react';
 
 export const metadata: Metadata = {
@@ -17,7 +17,9 @@ export const metadata: Metadata = {
   description: 'Browse all product categories at NOVA Commerce. Find audio gear, workspace tools, carry accessories, and wearables.',
 };
 
-export default function CategoriesPage() {
+export default async function CategoriesPage() {
+  const categories = await getCategories();
+
   return (
     <Container maxWidth="lg" sx={{ py: 4, mb: 10 }}>
       {/* Breadcrumb Navigasyon */}
@@ -46,7 +48,7 @@ export default function CategoriesPage() {
 
       {/* Kategori Izgarası (Category Showcase Grid) */}
       <Grid container spacing={4}>
-        {MOCK_CATEGORIES.map((cat) => (
+        {categories.map((cat) => (
           <Grid key={cat.id} size={{ xs: 12, sm: 6, md: 6 }}>
             <Link href={`/products/${cat.slug}`} style={{ textDecoration: 'none' }}>
               <Card

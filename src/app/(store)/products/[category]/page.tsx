@@ -11,8 +11,8 @@ import Link from 'next/link';
 import ProductCard from '@/components/store/ProductCard';
 import ProductSort from '@/components/product/ProductSort';
 import ProductFilters from '@/components/product/ProductFilters';
-import { MOCK_PRODUCTS, MOCK_CATEGORIES } from '@/lib/mockData';
-import { Product } from '@/types/product';
+import { getCategoryBySlug } from '@/lib/db/categories';
+import { getProducts } from '@/lib/db/products';
 import { ChevronRight, PackageSearch } from 'lucide-react';
 
 interface CategoryPageProps {
@@ -29,7 +29,7 @@ interface CategoryPageProps {
 // 1. Dinamik Kategori SEO Metadata Üretimi
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {
   const { category } = await params;
-  const matchedCategory = MOCK_CATEGORIES.find((c) => c.slug === category.toLowerCase());
+  const matchedCategory = await getCategoryBySlug(category);
 
   if (!matchedCategory) {
     return {
@@ -39,7 +39,7 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
 
   return {
     title: `${matchedCategory.name} Products | NOVA Commerce`,
-    description: matchedCategory.description,
+    description: matchedCategory.description || undefined,
   };
 }
 
@@ -48,7 +48,7 @@ export default async function CategoryProductsPage({ params, searchParams }: Cat
   const resolvedSearchParams = await searchParams;
 
   const categorySlug = category.toLowerCase();
-  const matchedCategory = MOCK_CATEGORIES.find((c) => c.slug === categorySlug);
+  const matchedCategory = await getCategoryBySlug(categorySlug);
 
   if (!matchedCategory) {
     notFound();
@@ -58,29 +58,12 @@ export default async function CategoryProductsPage({ params, searchParams }: Cat
   const saleOnly = resolvedSearchParams.sale === 'true';
   const searchQuery = resolvedSearchParams.search?.trim();
 
-  // 2. Veri Filtreleme Mantığı (Server-Side)
-  let filteredProducts: Product[] = MOCK_PRODUCTS.filter((prod) => {
-    if (prod.category.toLowerCase() !== categorySlug) {
-      return false;
-    }
-    if (saleOnly && prod.badge !== 'Sale') {
-      return false;
-    }
-    if (searchQuery) {
-      const term = searchQuery.toLowerCase();
-      if (!prod.title.toLowerCase().includes(term)) {
-        return false;
-      }
-    }
-    return true;
-  });
-
-  // 3. Sıralama Mantığı
-  filteredProducts = [...filteredProducts].sort((a, b) => {
-    if (sortOption === 'price-asc') return a.price - b.price;
-    if (sortOption === 'price-desc') return b.price - a.price;
-    if (sortOption === 'rating') return b.rating - a.rating;
-    return 0;
+  // 2. Prisma Database Query (Server Component)
+  const filteredProducts = await getProducts({
+    category: categorySlug,
+    sort: sortOption,
+    sale: saleOnly,
+    search: searchQuery,
   });
 
   return (
@@ -120,40 +103,41 @@ export default async function CategoryProductsPage({ params, searchParams }: Cat
         }}
       >
         <Box sx={{ maxWidth: 600 }}>
-          <Typography variant="overline" sx={{ color: '#6366f1', fontWeight: 700, letterSpacing: '0.1em' }}>
-            CATEGORY COLLECTION
+          <Typography variant="h4" sx={{ fontWeight: 800, mb: 1 }}>
+            {matchedCategory.name} Collection
           </Typography>
-          <Typography variant="h3" sx={{ fontWeight: 800, mt: 0.5, mb: 1 }}>
-            {matchedCategory.name}
-          </Typography>
-          <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+          <Typography variant="body1" color="text.secondary">
             {matchedCategory.description}
           </Typography>
         </Box>
-
-        <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-          <Typography variant="h5" sx={{ fontWeight: 800 }}>
-            {filteredProducts.length} Items
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Available in {matchedCategory.name}
-          </Typography>
-        </Box>
+        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main', bgcolor: 'action.hover', px: 2, py: 1, borderRadius: 1 }}>
+          {filteredProducts.length} {filteredProducts.length === 1 ? 'Product Available' : 'Products Available'}
+        </Typography>
       </Box>
 
-      {/* Üst Sıralama Barı */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 3 }}>
+      {/* Üst Sıralama & Filtreleme Barları */}
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 3,
+        }}
+      >
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+          Explore Products
+        </Typography>
         <ProductSort />
       </Box>
 
-      {/* Ana Sayfa Düzeni (Sol: Özelleştirilmiş Filtre, Sağ: Ürün Izgarası) */}
+      {/* Ana Sayfa Düzeni (Sol: Filtreler, Sağ: Ürün Izgarası) */}
       <Grid container spacing={4}>
-        {/* Sol Panel: Özelleştirilmiş Filtre (Gereksiz Kategori Checkbox'ları Yok!) */}
+        {/* Sol Panel: Filtreler */}
         <Grid size={{ xs: 12, md: 3 }}>
-          <ProductFilters hideCategoryFilter={true} />
+          <ProductFilters />
         </Grid>
 
-        {/* Sağ Panel: Ürün Listesi */}
+        {/* Sağ Panel: Ürün Listesi veya Boş Sonuç Ekranı */}
         <Grid size={{ xs: 12, md: 9 }}>
           {filteredProducts.length > 0 ? (
             <Grid container spacing={3}>
@@ -181,14 +165,14 @@ export default async function CategoryProductsPage({ params, searchParams }: Cat
             >
               <PackageSearch size={48} color="#9ca3af" />
               <Typography variant="h6" sx={{ fontWeight: 700, mt: 2, mb: 1 }}>
-                No products found in {matchedCategory.name}
+                No products found in this category
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 360, mb: 3 }}>
-                We couldn't find any products matching your current filters in this category.
+                We couldn&apos;t find any products in {matchedCategory.name} matching your current filters.
               </Typography>
               <Link href={`/products/${categorySlug}`} style={{ textDecoration: 'none' }}>
                 <Button variant="contained" color="primary">
-                  Clear Filters
+                  Clear Category Filters
                 </Button>
               </Link>
             </Box>
