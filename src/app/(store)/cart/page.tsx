@@ -424,6 +424,8 @@ export default function CartPage() {
                     variant="contained"
                     fullWidth
                     size="large"
+                    component={Link}
+                    href="/checkout"
                     endIcon={<ArrowRight size={18} />}
                     sx={{ py: 1.5, fontWeight: 700, fontSize: '1rem' }}
                   >
