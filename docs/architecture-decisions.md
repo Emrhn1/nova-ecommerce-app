@@ -149,7 +149,12 @@ Bu doküman, Next.js e-ticaret projesi boyunca alınan teknik ve mimari kararlar
   - Mock veriden gerçek ve ilişkisel veritabanına geçerek tam işlevsel e-ticaret altyapısını kurmak.
   - Tip güvenli Prisma Client ile sunucu taraflı performanslı sorgulama sağlamak.
 
-
-
-
-
+### 13. ADR-013: Checkout Multi-Step Form & Atomic Order Transaction Architecture
+- **Tarih:** 2026-09-07
+- **Karar:**
+  1. **İstemci Tarafı Form ve Durum Yönetimi (CSR - `/checkout`):** Checkout süreci çok adımlı doğrulama (Adres -> Kargo Yöntemi -> Kart Ödemesi) ve Redux sepet verisi ile anlık etkileşim gerektirdiğinden Client Component olarak inşa edildi. Zod ve React Hook Form ile hem anlık girdi maskelemesi (kart numarası, SKT, CVC) hem de şema doğrulaması sağlandı.
+  2. **Atomik Sipariş Mutasyonu (`createOrderAction` Server Action):** Sipariş verme işlemi sunucu tarafında atomik `prisma.$transaction` ile koruma altına alındı. İşlem sırasında ürün stokları kontrol edildi (`stockQuantity >= quantity`), stok miktarları anında düşüldü (`decrement`), `Order` ve `OrderItem` kayıtları oluşturuldu ve kullanıcı adresi saklandı. Herhangi bir stok yetersizliğinde tüm işlem otomatik geri alındı (Rollback).
+  3. **Güvenli Sipariş Onay Sayfası (Dinamik SSR - `/checkout/success/[orderId]`):** Kişiye özel sipariş detay sayfası Server Component olarak kurgulandı. Clerk `auth()` ile istek anında oturum açan kullanıcı doğrulandı ve siparişin bu kullanıcıya ait olduğu sunucuda teyit edilerek (`order.user.clerkId !== clerkId`) yetkisiz erişimler ve veri sızıntıları 0ms'de engellendi. İstemci tarafındaki sepet, izole bir `<ClearCartOnSuccess />` bileşeni ile sessizce temizlendi.
+- **Gerekçe:**
+  - Race condition (aynı anda son stoğu birden fazla kişinin alması) riskini Prisma transaction ile sıfırlamak.
+  - Hassas sipariş ve adres verilerinin istemciye gereksiz gitmesini önleyerek %100 sunucu taraflı yetkilendirme sağlamak.
