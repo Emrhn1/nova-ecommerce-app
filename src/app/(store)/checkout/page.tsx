@@ -67,7 +67,7 @@ export default function CheckoutPage() {
   const [shippingAddress, setShippingAddress] = useState({
     fullName: '',
     email: '',
-    phone: '',
+    phone: '+90 ',
     street: '',
     city: '',
     state: '',
@@ -103,7 +103,8 @@ export default function CheckoutPage() {
         user.primaryEmailAddress?.emailAddress ||
         user.emailAddresses?.[0]?.emailAddress ||
         '';
-      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+      const rawFullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+      const fullName = rawFullName.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]/g, '');
       setShippingAddress((prev) => ({
         ...prev,
         email: prev.email || email,
@@ -143,6 +144,76 @@ export default function CheckoutPage() {
     }
   };
 
+  // Helper to format Turkish phone number: +90 5XX XXX XX XX or +90 222 333 44 55
+  const formatPhoneNumber = (value: string): string => {
+    const rawDigits = value.replace(/\D/g, '');
+    let clean = rawDigits;
+    if (clean.startsWith('90')) {
+      clean = clean.slice(2);
+    } else if (clean.startsWith('0')) {
+      clean = clean.slice(1);
+    }
+    clean = clean.slice(0, 10);
+
+    if (!clean) return '+90 ';
+
+    let formatted = '+90 ';
+    if (clean.length > 0) {
+      formatted += clean.slice(0, 3);
+    }
+    if (clean.length > 3) {
+      formatted += ' ' + clean.slice(3, 6);
+    }
+    if (clean.length > 6) {
+      formatted += ' ' + clean.slice(6, 8);
+    }
+    if (clean.length > 8) {
+      formatted += ' ' + clean.slice(8, 10);
+    }
+    return formatted;
+  };
+
+  // Input Sanitization Handlers
+  const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = e.target.value.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]/g, '');
+    setShippingAddress((prev) => ({ ...prev, fullName: sanitized }));
+    if (errors.fullName) setErrors((prev) => ({ ...prev, fullName: '' }));
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val.length < 4) {
+      setShippingAddress((prev) => ({ ...prev, phone: '+90 ' }));
+      return;
+    }
+    const formatted = formatPhoneNumber(val);
+    setShippingAddress((prev) => ({ ...prev, phone: formatted }));
+    if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
+  };
+
+  const handleCityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = e.target.value.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]/g, '');
+    setShippingAddress((prev) => ({ ...prev, city: sanitized }));
+    if (errors.city) setErrors((prev) => ({ ...prev, city: '' }));
+  };
+
+  const handleStateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = e.target.value.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]/g, '');
+    setShippingAddress((prev) => ({ ...prev, state: sanitized }));
+  };
+
+  const handlePostalCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = e.target.value.replace(/\D/g, '').slice(0, 5);
+    setShippingAddress((prev) => ({ ...prev, postalCode: sanitized }));
+    if (errors.postalCode) setErrors((prev) => ({ ...prev, postalCode: '' }));
+  };
+
+  const handleCardHolderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitized = e.target.value.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]/g, '');
+    setPaymentInfo((prev) => ({ ...prev, cardHolder: sanitized }));
+    if (errors.cardHolder) setErrors((prev) => ({ ...prev, cardHolder: '' }));
+  };
+
   // Card Formatters
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
@@ -169,14 +240,39 @@ export default function CheckoutPage() {
   // Step 1 Validation
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {};
-    if (!shippingAddress.fullName.trim()) newErrors.fullName = 'Full name is required';
-    if (!shippingAddress.email.trim() || !/\S+@\S+\.\S+/.test(shippingAddress.email))
+    if (!shippingAddress.fullName.trim()) {
+      newErrors.fullName = 'Full name is required';
+    } else if (shippingAddress.fullName.trim().length < 2) {
+      newErrors.fullName = 'Full name must be at least 2 characters';
+    } else if (!/^[a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]+$/.test(shippingAddress.fullName.trim())) {
+      newErrors.fullName = 'Full name must contain letters only';
+    }
+
+    if (!shippingAddress.email.trim() || !/\S+@\S+\.\S+/.test(shippingAddress.email)) {
       newErrors.email = 'Valid email is required';
-    if (!shippingAddress.phone.trim() || shippingAddress.phone.length < 7)
-      newErrors.phone = 'Valid phone number is required';
-    if (!shippingAddress.street.trim()) newErrors.street = 'Street address is required';
-    if (!shippingAddress.city.trim()) newErrors.city = 'City is required';
-    if (!shippingAddress.postalCode.trim()) newErrors.postalCode = 'Postal code is required';
+    }
+
+    if (!shippingAddress.phone.trim() || shippingAddress.phone === '+90 ') {
+      newErrors.phone = 'Phone number is required';
+    } else if (!/^\+90\s\d{3}\s\d{3}\s\d{2}\s\d{2}$/.test(shippingAddress.phone.trim())) {
+      newErrors.phone = 'Complete phone number required (+90 5XX XXX XX XX)';
+    }
+
+    if (!shippingAddress.street.trim()) {
+      newErrors.street = 'Street address is required';
+    }
+
+    if (!shippingAddress.city.trim()) {
+      newErrors.city = 'City is required';
+    } else if (!/^[a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]+$/.test(shippingAddress.city.trim())) {
+      newErrors.city = 'City must contain letters only';
+    }
+
+    if (!shippingAddress.postalCode.trim()) {
+      newErrors.postalCode = 'Postal code is required';
+    } else if (!/^\d{5}$/.test(shippingAddress.postalCode.trim())) {
+      newErrors.postalCode = 'Postal code must be a 5-digit number (e.g. 34000)';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -186,11 +282,23 @@ export default function CheckoutPage() {
   const validateStep3 = () => {
     const newErrors: Record<string, string> = {};
     const rawCard = paymentInfo.cardNumber.replace(/\s+/g, '');
-    if (!paymentInfo.cardHolder.trim()) newErrors.cardHolder = 'Cardholder name is required';
-    if (rawCard.length !== 16) newErrors.cardNumber = 'Please enter a valid 16-digit card number';
-    if (!/^(0[1-9]|1[0-2])\/?([0-9]{2})$/.test(paymentInfo.expiryDate))
+    if (!paymentInfo.cardHolder.trim()) {
+      newErrors.cardHolder = 'Cardholder name is required';
+    } else if (!/^[a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]+$/.test(paymentInfo.cardHolder.trim())) {
+      newErrors.cardHolder = 'Cardholder name must contain letters only';
+    }
+
+    if (rawCard.length !== 16) {
+      newErrors.cardNumber = 'Please enter a valid 16-digit card number';
+    }
+
+    if (!/^(0[1-9]|1[0-2])\/?([0-9]{2})$/.test(paymentInfo.expiryDate)) {
       newErrors.expiryDate = 'Valid expiry date (MM/YY) required';
-    if (paymentInfo.cvc.length < 3) newErrors.cvc = 'Valid 3 or 4-digit CVC required';
+    }
+
+    if (paymentInfo.cvc.length < 3) {
+      newErrors.cvc = 'Valid 3 or 4-digit CVC required';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -338,11 +446,9 @@ export default function CheckoutPage() {
                         fullWidth
                         size="small"
                         label="Full Name"
+                        placeholder="e.g. John Doe"
                         value={shippingAddress.fullName}
-                        onChange={(e) => {
-                          setShippingAddress({ ...shippingAddress, fullName: e.target.value });
-                          if (errors.fullName) setErrors({ ...errors, fullName: '' });
-                        }}
+                        onChange={handleFullNameChange}
                         error={!!errors.fullName}
                         helperText={errors.fullName}
                         required
@@ -371,14 +477,16 @@ export default function CheckoutPage() {
                         fullWidth
                         size="small"
                         label="Phone Number"
-                        placeholder="+90 555 123 4567"
+                        placeholder="+90 5XX XXX XX XX"
                         value={shippingAddress.phone}
-                        onChange={(e) => {
-                          setShippingAddress({ ...shippingAddress, phone: e.target.value });
-                          if (errors.phone) setErrors({ ...errors, phone: '' });
+                        onChange={handlePhoneChange}
+                        onFocus={() => {
+                          if (!shippingAddress.phone) {
+                            setShippingAddress((prev) => ({ ...prev, phone: '+90 ' }));
+                          }
                         }}
                         error={!!errors.phone}
-                        helperText={errors.phone}
+                        helperText={errors.phone || 'Format: +90 5XX XXX XX XX'}
                         required
                       />
                     </Grid>
@@ -405,11 +513,9 @@ export default function CheckoutPage() {
                         fullWidth
                         size="small"
                         label="City"
+                        placeholder="e.g. Istanbul"
                         value={shippingAddress.city}
-                        onChange={(e) => {
-                          setShippingAddress({ ...shippingAddress, city: e.target.value });
-                          if (errors.city) setErrors({ ...errors, city: '' });
-                        }}
+                        onChange={handleCityChange}
                         error={!!errors.city}
                         helperText={errors.city}
                         required
@@ -422,9 +528,7 @@ export default function CheckoutPage() {
                         size="small"
                         label="State / Province"
                         value={shippingAddress.state}
-                        onChange={(e) =>
-                          setShippingAddress({ ...shippingAddress, state: e.target.value })
-                        }
+                        onChange={handleStateChange}
                       />
                     </Grid>
 
@@ -433,13 +537,11 @@ export default function CheckoutPage() {
                         fullWidth
                         size="small"
                         label="Postal / ZIP Code"
+                        placeholder="e.g. 34000"
                         value={shippingAddress.postalCode}
-                        onChange={(e) => {
-                          setShippingAddress({ ...shippingAddress, postalCode: e.target.value });
-                          if (errors.postalCode) setErrors({ ...errors, postalCode: '' });
-                        }}
+                        onChange={handlePostalCodeChange}
                         error={!!errors.postalCode}
-                        helperText={errors.postalCode}
+                        helperText={errors.postalCode || '5-digit postal code'}
                         required
                       />
                     </Grid>
@@ -619,11 +721,9 @@ export default function CheckoutPage() {
                         fullWidth
                         size="small"
                         label="Cardholder Name"
+                        placeholder="e.g. John Doe"
                         value={paymentInfo.cardHolder}
-                        onChange={(e) => {
-                          setPaymentInfo({ ...paymentInfo, cardHolder: e.target.value });
-                          if (errors.cardHolder) setErrors({ ...errors, cardHolder: '' });
-                        }}
+                        onChange={handleCardHolderChange}
                         error={!!errors.cardHolder}
                         helperText={errors.cardHolder}
                         required
