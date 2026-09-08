@@ -1,13 +1,26 @@
 import { z } from 'zod';
 
 export const shippingAddressSchema = z.object({
-  fullName: z.string().min(2, 'Full name must be at least 2 characters'),
+  fullName: z
+    .string()
+    .min(2, 'Full name must be at least 2 characters')
+    .regex(/^[a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]+$/, 'Full name must contain letters only'),
   email: z.string().email('Please enter a valid email address'),
-  phone: z.string().min(7, 'Please enter a valid phone number'),
+  phone: z
+    .string()
+    .regex(/^\+90\s\d{3}\s\d{3}\s\d{2}\s\d{2}$/, 'Phone number must be in format: +90 5XX XXX XX XX'),
   street: z.string().min(5, 'Street address must be at least 5 characters'),
-  city: z.string().min(2, 'City is required'),
-  state: z.string().optional(),
-  postalCode: z.string().min(3, 'Valid postal/ZIP code is required'),
+  city: z
+    .string()
+    .min(2, 'City is required')
+    .regex(/^[a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]+$/, 'City must contain letters only'),
+  state: z
+    .string()
+    .regex(/^[a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]*$/, 'State must contain letters only')
+    .optional(),
+  postalCode: z
+    .string()
+    .regex(/^\d{5}$/, 'Postal code must be a 5-digit number'),
   country: z.string().min(2, 'Country is required').default('Turkey'),
   saveAddress: z.boolean().optional().default(false),
 });
@@ -19,7 +32,10 @@ export const shippingMethodSchema = z.object({
 });
 
 export const paymentSchema = z.object({
-  cardHolder: z.string().min(2, 'Cardholder name is required'),
+  cardHolder: z
+    .string()
+    .min(2, 'Cardholder name is required')
+    .regex(/^[a-zA-ZğüşıöçĞÜŞİÖÇ\s'-]+$/, 'Cardholder name must contain letters only'),
   cardNumber: z
     .string()
     .transform((val) => val.replace(/\s+/g, ''))
